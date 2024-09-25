@@ -1,0 +1,4 @@
+pandas
+streamlit
+fuzzywuzzy
+python-Levenshtein  # Optional but improves fuzzywuzzy performance
