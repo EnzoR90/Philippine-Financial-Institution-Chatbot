@@ -1,6 +1,6 @@
 Werkzeug==1.0.1
-Flask==2.0.3
+Flask==1.1.2
 pandas
 streamlit
 fuzzywuzzy
-python-Levenshtein  # Optional but improves fuzzywuzzy performance
+python-Levenshtein
