@@ -1,4 +1,4 @@
-
+whitenoise
 Flask==2.3.2
 gunicorn==23.0.0
 Werkzeug>=2.0

@@ -2,8 +2,9 @@ from flask import Flask, request, render_template
 import pandas as pd
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
-
-app = Flask(__name__)
+from whitenoise import WhiteNoise
+app = Flask(__name__, static_folder='static', static_url_path='/static')
+app.wsgi_app = WhiteNoise(app.wsgi_app, root='static/')
 
 # Load the dataset
 file_path = 'Updated_FinancialInclusion_Final.csv'
@@ -44,5 +45,4 @@ def get_response():
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
-    # Trigger redeployment
+    app.run(host='0.0.0.0', port=port)
