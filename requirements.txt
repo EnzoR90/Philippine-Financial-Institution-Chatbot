@@ -1,5 +1,6 @@
-Werkzeug==1.0.1
-Flask==1.1.2
+Werkzeug>=2.0
+Flask==2.0.3
+Jinja2==3.0.3
 pandas
 streamlit
 fuzzywuzzy
