@@ -3,7 +3,7 @@ from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 
 # Load the dataset
-file_path = 'https://github.com/EnzoR90/Philippine-Financial-Institution-Chatbot/blob/master/Updated_FinancialInclusion_Final.csv'
+file_path = 'Updated_FinancialInclusion_Final.csv'
 data = pd.read_csv(file_path)
 
 # Prepare city and province lists for matching
