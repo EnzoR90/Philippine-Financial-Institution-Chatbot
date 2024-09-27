@@ -20,7 +20,7 @@ provinces_list = data['Province'].str.lower().unique()
 # Create Flask app
 app = Flask(__name__)
 
-# Fuzzy matching functions (same as your original functions)
+# Fuzzy matching functions
 def get_fis_in_city(city_name, df):
     city_name = city_name.strip().lower()
     df['Cities'] = df['Cities'].str.strip().str.lower()
@@ -62,9 +62,26 @@ def get_cities_in_province(province_name, df):
             return response
     return f"No data found for province: {province_name}"
 
+# Example function to detect city or province (ensure this is defined)
+def detect_city_or_province(user_input, cities_list, provinces_list):
+    user_input = user_input.lower()
+
+    closest_city = process.extractOne(user_input, cities_list, scorer=fuzz.partial_ratio)
+    if closest_city and closest_city[1] >= 90:
+        return 'city', closest_city[0]
+
+    closest_province = process.extractOne(user_input, provinces_list, scorer=fuzz.partial_ratio)
+    if closest_province and closest_province[1] >= 90:
+        return 'province', closest_province[0]
+
+    return None, None
+
 # Flask route to interact with the chatbot
-@app.route('/chatbot', methods=['POST'])
+@app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
+    if request.method == 'GET':
+        return "Chatbot is running. Please use POST requests."
+    
     user_input = request.json.get('query', '').lower()
     entity_type, entity_value = detect_city_or_province(user_input, cities_list, provinces_list)
 
