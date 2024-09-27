@@ -6,6 +6,7 @@ Created on Wed Sep 25 22:48:47 2024
 @author: enzorodriguez
 """
 
+from flask_cors import CORS
 from flask import Flask, request, jsonify
 import pandas as pd
 from fuzzywuzzy import fuzz, process
