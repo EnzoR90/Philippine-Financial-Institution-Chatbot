@@ -8,76 +8,101 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background-color: #f0f0f0;
             color: #333;
         }
-        h1 {
-            color: #4CAF50;
-            font-size: 2.5em;
-        }
-        h2 {
-            margin-top: 20px;
-            color: #333;
-        }
-        .subtitle {
-            font-size: 1.2em;
-            color: #777;
-            margin-bottom: 20px;
-        }
-        form {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-        input[type="text"] {
+        .chat-container {
             width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            border: 1px solid #ccc;
-            border-radius: 4px;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        input[type="submit"] {
+        .chat-history {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .chat-bubble {
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .chat-bubble.user {
             background-color: #4CAF50;
             color: white;
+            align-self: flex-end;
+        }
+        .chat-bubble.bot {
+            background-color: #f1f1f1;
+            color: #333;
+            align-self: flex-start;
+        }
+        .chat-input {
+            display: flex;
+            margin-top: 10px;
+        }
+        .chat-input input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+        }
+        .chat-input button {
             padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
         }
-        input[type="submit"]:hover {
+        .chat-input button:hover {
             background-color: #45a049;
         }
-        pre {
-            background-color: #fff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            white-space: pre-wrap;
-            word-wrap: break-word;
+        .chat-bubble.bot span.instructions {
+            font-style: italic;
+            color: #777;
         }
     </style>
 </head>
 <body>
-    <h1>Philippine Financial Institutions Chatbot</h1>
-    <div class="subtitle">
-        You can query cities, provinces, and select statistics (e.g., mean, max, min). The chatbot will provide the total number of Financial Institutions based on the Bangko Sentral ng Pilipinas' March 2024 physical networks.
+    <div class="chat-container">
+        <div class="chat-history" id="chatHistory">
+            <!-- Chat messages will appear here -->
+            <div class="chat-bubble bot">
+                <span class="instructions">Welcome to the Philippine Financial Institutions Chatbot! You can ask about cities, provinces, or statistics. Type your question below or type "exit" to end the chat.</span>
+            </div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="query" placeholder="Type your message here..." autofocus required>
+            <button id="submitBtn">Send</button>
+        </div>
     </div>
-    <form id="chatbotForm">
-        <label for="query">Ask a question:</label><br>
-        <input type="text" id="query" name="query" placeholder="e.g. How many FIs are in Manila?" required><br><br>
-        <input type="submit" value="Submit">
-    </form>
-    <h2>Response:</h2>
-    <pre id="response"></pre>
 
     <script>
-        document.getElementById("chatbotForm").addEventListener("submit", async function(event) {
-            event.preventDefault();
-            
-            const query = document.getElementById("query").value;
-            const responseElement = document.getElementById("response");
+        document.getElementById('submitBtn').addEventListener('click', sendMessage);
+
+        document.getElementById('query').addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const query = document.getElementById("query").value.trim();
+            if (!query) return; // Don't send empty messages
+
+            // Add user message to chat history
+            addMessageToChat('user', query);
 
             // Send POST request to your Flask chatbot API
             try {
@@ -89,26 +114,38 @@
                     body: JSON.stringify({ query: query }),
                 });
 
-                // Parse the JSON response from the server
                 const data = await response.json();
-                
-                // Clean and format the response string without JSON brackets
-                if (typeof data === 'object') {
-                    if (Array.isArray(data)) {
-                        const result = data.map(item => 
-                            `${item.Cities || ''}, ${item.Province || ''}: ${item['Total Number of Fis'] || ''} FIs`
-                        ).join("\n");
-                        responseElement.textContent = result || 'No data found';
-                    } else {
-                        responseElement.textContent = 'No data found';
-                    }
+
+                // Display chatbot's response
+                if (Array.isArray(data)) {
+                    const result = data.map(item => `${item.Cities}, ${item.Province}: ${item['Total Number of Fis']} FIs`).join("\n");
+                    addMessageToChat('bot', result);
                 } else {
-                    responseElement.textContent = data;
+                    addMessageToChat('bot', data);
                 }
+                
+                // If the user types "exit", show exit message and clear input
+                if (query.toLowerCase() === 'exit') {
+                    addMessageToChat('bot', 'Thank you for using the chatbot! Goodbye.');
+                    document.getElementById('query').disabled = true;
+                    document.getElementById('submitBtn').disabled = true;
+                }
+
             } catch (error) {
-                responseElement.textContent = "Error: Could not connect to chatbot.";
+                addMessageToChat('bot', "Error: Could not connect to chatbot.");
             }
-        });
+
+            document.getElementById("query").value = ''; // Clear the input box
+        }
+
+        function addMessageToChat(sender, message) {
+            const chatHistory = document.getElementById('chatHistory');
+            const chatBubble = document.createElement('div');
+            chatBubble.classList.add('chat-bubble', sender);
+            chatBubble.textContent = message;
+            chatHistory.appendChild(chatBubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to the latest message
+        }
     </script>
 </body>
 </html>
