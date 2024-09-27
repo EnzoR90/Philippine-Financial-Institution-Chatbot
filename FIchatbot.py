@@ -81,18 +81,19 @@ def get_cities_in_province(province_name, df):
 
 # Detect city, province, or statistics
 def detect_query_type(user_input):
-    # Step 1: Ask the user if it's a city, province, or statistics query
-    if "type" not in session_state:
-        session_state["type"] = "pending"  # Waiting for user to confirm type
+    # Step 1: Immediately check if the input matches city or province keywords
+    if "city" in user_input:
+        session_state["type"] = "city"
+        return "Please provide the name of the city."
+    elif "province" in user_input:
+        session_state["type"] = "province"
+        return "Please provide the name of the province."
+    elif any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
+        session_state["type"] = "statistics"
+        return "Please specify the type of statistic (mean, max, min)."
+    else:
+        # Ask the user to clarify
         return "Are you asking about a city, a province, or statistics?"
-
-    # Step 2: If we already know the type, proceed with the query
-    if session_state["type"] == "city":
-        return 'city', user_input
-    elif session_state["type"] == "province":
-        return 'province', user_input
-    elif session_state["type"] == "statistics":
-        return 'statistic', user_input
 
 # Reset session after user types "exit"
 def reset_session():
@@ -111,28 +112,17 @@ def chatbot():
         reset_session()
         return jsonify("Thank you for using the chatbot! Goodbye.")
     
-    # Step 1: If the session state is new, ask the user for the query type
-    if "type" not in session_state or session_state["type"] == "pending":
-        if "city" in user_input:
-            session_state["type"] = "city"
-            return jsonify("Please provide the name of the city.")
-        elif "province" in user_input:
-            session_state["type"] = "province"
-            return jsonify("Please provide the name of the province.")
-        elif "statistics" in user_input or any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
-            session_state["type"] = "statistics"
-            return jsonify("Please specify the type of statistic (mean, max, min).")
-        else:
-            return jsonify("Are you asking about a city, a province, or statistics?")
+    # Immediately detect query type without waiting
+    if "type" not in session_state:
+        response = detect_query_type(user_input)
+        return jsonify(response)
     
-    # Step 2: Process the query based on user type (city, province, statistics)
-    query_type, query_value = detect_query_type(user_input)
-    
-    if query_type == 'city':
-        response = get_fis_in_city(query_value, data)
-    elif query_type == 'province':
-        response = get_cities_in_province(query_value, data)
-    elif query_type == 'statistic':
+    # Process the query based on the detected type
+    if session_state["type"] == "city":
+        response = get_fis_in_city(user_input, data)
+    elif session_state["type"] == "province":
+        response = get_cities_in_province(user_input, data)
+    elif session_state["type"] == "statistics":
         response = "Statistics feature is under development."  # Placeholder for future implementation
     else:
         response = "I don't understand your query. Please ask about cities, provinces, or statistics."
