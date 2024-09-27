@@ -10,6 +10,10 @@ from flask_cors import CORS
 from flask import Flask, request, jsonify
 import pandas as pd
 from fuzzywuzzy import fuzz, process
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Load the dataset
 file_path = './Updated_FinancialInclusion_Final.csv'
@@ -22,33 +26,37 @@ provinces_list = data['Province'].str.lower().unique()
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Fuzzy matching functions for cities
+# Improved Fuzzy matching for cities
 def get_fis_in_city(city_name, df):
+    logging.debug(f"Searching for city: {city_name}")
     city_name = city_name.strip().lower()
     df['Cities'] = df['Cities'].str.strip().str.lower()
 
-    # Adjusted fuzzy matching threshold for cities
-    result = process.extractOne(city_name, df['Cities'], scorer=fuzz.ratio)
+    # Loosen the fuzzy matching threshold slightly
+    result = process.extractOne(city_name, df['Cities'], scorer=fuzz.partial_ratio)
     
     if result:
         closest_match, score = result[0], result[1]
-        if score >= 90:  # Stricter threshold for city matching
+        logging.debug(f"Best match: {closest_match} with score: {score}")
+        if score >= 80:  # Loosened matching threshold
             city_data = df[df['Cities'] == closest_match]
             return city_data[['Cities', 'Province', 'Total Number of Fis']].to_dict(orient='records')
     
     return f"No data found for city: {city_name}"
 
-# Function to handle province queries, providing city details, highest, and lowest FIs
+# Fuzzy matching for provinces
 def get_cities_in_province(province_name, df):
+    logging.debug(f"Searching for province: {province_name}")
     province_name = province_name.strip().lower()
     df['Province'] = df['Province'].str.strip().str.lower()
-    
-    # Adjusted fuzzy matching threshold for provinces
-    result = process.extractOne(province_name, df['Province'], scorer=fuzz.ratio)
+
+    # Fuzzy match the province
+    result = process.extractOne(province_name, df['Province'], scorer=fuzz.partial_ratio)
     
     if result:
         closest_match, score = result[0], result[1]
-        if score >= 90:  # Stricter threshold for province matching
+        logging.debug(f"Best match: {closest_match} with score: {score}")
+        if score >= 90:  # Stricter matching threshold for provinces
             province_data = df[df['Province'] == closest_match]
             cities_info = province_data[['Cities', 'Total Number of Fis']].to_dict(orient='records')
             total_fis_in_province = province_data['Total Number of Fis'].sum()
@@ -70,39 +78,32 @@ def get_cities_in_province(province_name, df):
             return response
     return f"No data found for province: {province_name}"
 
-# Function to provide statistics (mean, max, min)
-def get_statistics(df, stat_type):
-    if stat_type == "mean" or stat_type == "average":
-        avg_fis = df['Total Number of Fis'].mean()
-        return f"The average number of financial institutions per city is {avg_fis:.2f}"
-    elif stat_type == "max" or stat_type == "highest":
-        max_fis_city = df.loc[df['Total Number of Fis'].idxmax()]
-        return f"{max_fis_city['Cities']} has the highest number of financial institutions with {max_fis_city['Total Number of Fis']} FIs."
-    elif stat_type == "min" or stat_type == "lowest":
-        min_fis_city = df.loc[df['Total Number of Fis'].idxmin()]
-        return f"{min_fis_city['Cities']} has the lowest number of financial institutions with {min_fis_city['Total Number of Fis']} FIs."
-    return "Statistics type not recognized. Please ask for 'mean', 'max', or 'min'."
-
-# Function to detect the type of query (city, province, statistics)
+# Improved handling of query detection
 def detect_query_type(user_input, cities_list, provinces_list):
-    user_input = user_input.lower()
+    logging.debug(f"Processing user input: {user_input}")
+    user_input = user_input.lower().strip()
 
     # Handle the 'exit' command explicitly
     if "exit" in user_input:
         return 'exit', None
 
+    # Strip extra words like "city", "province", etc.
+    stripped_input = user_input.replace("city", "").replace("province", "").strip()
+
     # Check if the query contains a statistic keyword
-    if any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
-        return 'statistic', user_input
+    if any(stat in stripped_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
+        return 'statistic', stripped_input
     
     # Fuzzy match for cities
-    closest_city = process.extractOne(user_input, cities_list, scorer=fuzz.ratio)
-    if closest_city and closest_city[1] >= 90:
+    closest_city = process.extractOne(stripped_input, cities_list, scorer=fuzz.partial_ratio)
+    if closest_city and closest_city[1] >= 80:
+        logging.debug(f"City detected: {closest_city[0]} with score: {closest_city[1]}")
         return 'city', closest_city[0]
 
     # Fuzzy match for provinces
-    closest_province = process.extractOne(user_input, provinces_list, scorer=fuzz.ratio)
+    closest_province = process.extractOne(stripped_input, provinces_list, scorer=fuzz.partial_ratio)
     if closest_province and closest_province[1] >= 90:
+        logging.debug(f"Province detected: {closest_province[0]} with score: {closest_province[1]}")
         return 'province', closest_province[0]
 
     return None, None
@@ -116,7 +117,7 @@ def chatbot():
     user_input = request.json.get('query', '').lower()
     query_type, query_value = detect_query_type(user_input, cities_list, provinces_list)
 
-    # Handle 'exit' query without any other response
+    # Handle 'exit' query
     if query_type == 'exit':
         return jsonify("Thank you for using the chatbot! Goodbye.")
 
