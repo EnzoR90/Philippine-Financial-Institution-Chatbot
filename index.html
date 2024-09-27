@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Institutions Chatbot</title>
+</head>
+<body>
+    <h1>Financial Institutions Chatbot</h1>
+    <form id="chatbotForm">
+        <label for="query">Ask a question:</label><br>
+        <input type="text" id="query" name="query" placeholder="e.g. How many FIs are in Manila?" required><br><br>
+        <input type="submit" value="Submit">
+    </form>
+    <h2>Response:</h2>
+    <pre id="response"></pre>
+
+    <script>
+        // JavaScript to handle form submission and send POST request to the chatbot API
+        document.getElementById("chatbotForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+            
+            // Get the user's query from the input field
+            const query = document.getElementById("query").value;
+            const responseElement = document.getElementById("response");
+
+            // Send POST request to your Flask chatbot API
+            try {
+                const response = await fetch("https://worker-production-1784.up.railway.app/chatbot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                // Parse the JSON response from the server
+                const data = await response.json();
+                
+                // Display the response in the browser
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseElement.textContent = "Error: Could not connect to chatbot.";
+            }
+        });
+    </script>
+</body>
+</html>
