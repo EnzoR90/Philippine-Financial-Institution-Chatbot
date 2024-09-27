@@ -88,64 +88,42 @@
         </div>
     </div>
 
-    <script>
-        document.getElementById('submitBtn').addEventListener('click', sendMessage);
+<script>
+    document.getElementById("chatbotForm").addEventListener("submit", async function(event) {
+        event.preventDefault();
+        
+        const query = document.getElementById("query").value;
+        const responseElement = document.getElementById("response");
 
-        document.getElementById('query').addEventListener('keypress', function (event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        });
+        // Send POST request to your Flask chatbot API
+        try {
+            const response = await fetch("https://worker-production-1784.up.railway.app/chatbot", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ query: query }),
+            });
 
-        async function sendMessage() {
-            const query = document.getElementById("query").value.trim();
-            if (!query) return; // Don't send empty messages
+            // Parse the JSON response from the server
+            const data = await response.json();
 
-            // Add user message to chat history
-            addMessageToChat('user', query);
-
-            // Send POST request to your Flask chatbot API
-            try {
-                const response = await fetch("https://worker-production-1784.up.railway.app/chatbot", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ query: query }),
+            // Handle the response and format for display
+            if (Array.isArray(data)) {
+                // Display each message from the chatbot (both answer and follow-up)
+                data.forEach(item => {
+                    const messageElement = document.createElement("div");
+                    messageElement.textContent = item;
+                    responseElement.appendChild(messageElement);
                 });
-
-                const data = await response.json();
-
-                // Display chatbot's response
-                if (Array.isArray(data)) {
-                    const result = data.map(item => `${item.Cities}, ${item.Province}: ${item['Total Number of Fis']} FIs`).join("\n");
-                    addMessageToChat('bot', result);
-                } else {
-                    addMessageToChat('bot', data);
-                }
-                
-                // If the user types "exit", show exit message and clear input
-                if (query.toLowerCase() === 'exit') {
-                    addMessageToChat('bot', 'Thank you for using the chatbot! Goodbye.');
-                    document.getElementById('query').disabled = true;
-                    document.getElementById('submitBtn').disabled = true;
-                }
-
-            } catch (error) {
-                addMessageToChat('bot', "Error: Could not connect to chatbot.");
+            } else {
+                responseElement.textContent = data;
             }
 
-            document.getElementById("query").value = ''; // Clear the input box
+        } catch (error) {
+            responseElement.textContent = "Error: Could not connect to chatbot.";
         }
-
-        function addMessageToChat(sender, message) {
-            const chatHistory = document.getElementById('chatHistory');
-            const chatBubble = document.createElement('div');
-            chatBubble.classList.add('chat-bubble', sender);
-            chatBubble.textContent = message;
-            chatHistory.appendChild(chatBubble);
-            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to the latest message
-        }
-    </script>
+    });
+</script>
 </body>
 </html>
