@@ -14,6 +14,10 @@ data = pd.read_csv(file_path)
 cities_list = data['Cities'].str.lower().unique()
 provinces_list = data['Province'].str.lower().unique()
 
+@app.route('/hello')
+def hello():
+    return "Hello, World!"
+
 @app.route('/')
 def home():
     return render_template('index.html')
