@@ -37,9 +37,11 @@ def get_fis_in_city(city_name, df):
     
     return f"No data found for city: {city_name}"
 
+# New version of get_cities_in_province to list all cities
 def get_cities_in_province(province_name, df):
     province_name = province_name.strip().lower()
     df['Province'] = df['Province'].str.strip().str.lower()
+    
     result = process.extractOne(province_name, df['Province'], scorer=fuzz.partial_ratio)
     
     if result:
@@ -47,9 +49,14 @@ def get_cities_in_province(province_name, df):
         if score >= 90:
             province_data = df[df['Province'] == closest_match]
             cities_info = province_data[['Cities', 'Total Number of Fis']].to_dict(orient='records')
+            
+            # Total FIs in the province
             total_fis_in_province = province_data['Total Number of Fis'].sum()
+            
+            # Find the city with the highest and lowest number of FIs
             city_with_highest_fis = province_data.loc[province_data['Total Number of Fis'].idxmax()]
             city_with_lowest_fis = province_data.loc[province_data['Total Number of Fis'].idxmin()]
+            
             response = {
                 'Province': closest_match,
                 'Total FIs in Province': total_fis_in_province,
@@ -83,6 +90,10 @@ def get_statistics(df, stat_type):
 def detect_query_type(user_input, cities_list, provinces_list):
     user_input = user_input.lower()
 
+    # Handle the 'exit' command
+    if "exit" in user_input:
+        return 'exit', None
+
     # Check if the query contains a statistic keyword
     if any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
         return 'statistic', user_input
@@ -107,6 +118,9 @@ def chatbot():
     
     user_input = request.json.get('query', '').lower()
     query_type, query_value = detect_query_type(user_input, cities_list, provinces_list)
+
+    if query_type == 'exit':
+        return jsonify("Thank you for using the chatbot! Goodbye.")
 
     if query_type == 'city':
         response = get_fis_in_city(query_value, data)
