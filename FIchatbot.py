@@ -26,7 +26,10 @@ provinces_list = data['Province'].str.lower().unique()
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Improved Fuzzy matching for cities
+# Global variable to track query type (city, province, or statistics)
+session_state = {}
+
+# Fuzzy matching functions (same as before)
 def get_fis_in_city(city_name, df):
     logging.debug(f"Searching for city: {city_name}")
     city_name = city_name.strip().lower()
@@ -38,25 +41,23 @@ def get_fis_in_city(city_name, df):
     if result:
         closest_match, score = result[0], result[1]
         logging.debug(f"Best match: {closest_match} with score: {score}")
-        if score >= 80:  # Loosened matching threshold
+        if score >= 80:
             city_data = df[df['Cities'] == closest_match]
             return city_data[['Cities', 'Province', 'Total Number of Fis']].to_dict(orient='records')
     
     return f"No data found for city: {city_name}"
 
-# Fuzzy matching for provinces
 def get_cities_in_province(province_name, df):
     logging.debug(f"Searching for province: {province_name}")
     province_name = province_name.strip().lower()
     df['Province'] = df['Province'].str.strip().str.lower()
 
-    # Fuzzy match the province
     result = process.extractOne(province_name, df['Province'], scorer=fuzz.partial_ratio)
     
     if result:
         closest_match, score = result[0], result[1]
         logging.debug(f"Best match: {closest_match} with score: {score}")
-        if score >= 90:  # Stricter matching threshold for provinces
+        if score >= 90:
             province_data = df[df['Province'] == closest_match]
             cities_info = province_data[['Cities', 'Total Number of Fis']].to_dict(orient='records')
             total_fis_in_province = province_data['Total Number of Fis'].sum()
@@ -78,35 +79,24 @@ def get_cities_in_province(province_name, df):
             return response
     return f"No data found for province: {province_name}"
 
-# Improved handling of query detection
-def detect_query_type(user_input, cities_list, provinces_list):
-    logging.debug(f"Processing user input: {user_input}")
-    user_input = user_input.lower().strip()
+# Detect city, province, or statistics
+def detect_query_type(user_input):
+    # Step 1: Ask the user if it's a city, province, or statistics query
+    if "type" not in session_state:
+        session_state["type"] = "pending"  # Waiting for user to confirm type
+        return "Are you asking about a city, a province, or statistics?"
 
-    # Handle the 'exit' command explicitly
-    if "exit" in user_input:
-        return 'exit', None
+    # Step 2: If we already know the type, proceed with the query
+    if session_state["type"] == "city":
+        return 'city', user_input
+    elif session_state["type"] == "province":
+        return 'province', user_input
+    elif session_state["type"] == "statistics":
+        return 'statistic', user_input
 
-    # Strip extra words like "city", "province", etc.
-    stripped_input = user_input.replace("city", "").replace("province", "").strip()
-
-    # Check if the query contains a statistic keyword
-    if any(stat in stripped_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
-        return 'statistic', stripped_input
-    
-    # Fuzzy match for cities
-    closest_city = process.extractOne(stripped_input, cities_list, scorer=fuzz.partial_ratio)
-    if closest_city and closest_city[1] >= 80:
-        logging.debug(f"City detected: {closest_city[0]} with score: {closest_city[1]}")
-        return 'city', closest_city[0]
-
-    # Fuzzy match for provinces
-    closest_province = process.extractOne(stripped_input, provinces_list, scorer=fuzz.partial_ratio)
-    if closest_province and closest_province[1] >= 90:
-        logging.debug(f"Province detected: {closest_province[0]} with score: {closest_province[1]}")
-        return 'province', closest_province[0]
-
-    return None, None
+# Reset session after user types "exit"
+def reset_session():
+    session_state.clear()
 
 # Flask route to interact with the chatbot
 @app.route('/chatbot', methods=['GET', 'POST'])
@@ -115,18 +105,35 @@ def chatbot():
         return "Chatbot is running. Please use POST requests."
     
     user_input = request.json.get('query', '').lower()
-    query_type, query_value = detect_query_type(user_input, cities_list, provinces_list)
-
-    # Handle 'exit' query
-    if query_type == 'exit':
+    
+    # Exit condition
+    if "exit" in user_input:
+        reset_session()
         return jsonify("Thank you for using the chatbot! Goodbye.")
-
+    
+    # Step 1: If the session state is new, ask the user for the query type
+    if "type" not in session_state or session_state["type"] == "pending":
+        if "city" in user_input:
+            session_state["type"] = "city"
+            return jsonify("Please provide the name of the city.")
+        elif "province" in user_input:
+            session_state["type"] = "province"
+            return jsonify("Please provide the name of the province.")
+        elif "statistics" in user_input or any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
+            session_state["type"] = "statistics"
+            return jsonify("Please specify the type of statistic (mean, max, min).")
+        else:
+            return jsonify("Are you asking about a city, a province, or statistics?")
+    
+    # Step 2: Process the query based on user type (city, province, statistics)
+    query_type, query_value = detect_query_type(user_input)
+    
     if query_type == 'city':
         response = get_fis_in_city(query_value, data)
     elif query_type == 'province':
         response = get_cities_in_province(query_value, data)
     elif query_type == 'statistic':
-        response = get_statistics(data, query_value)
+        response = "Statistics feature is under development."  # Placeholder for future implementation
     else:
         response = "I don't understand your query. Please ask about cities, provinces, or statistics."
 
