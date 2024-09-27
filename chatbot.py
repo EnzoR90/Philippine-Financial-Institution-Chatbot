@@ -40,8 +40,21 @@ def get_response():
 
     return render_template('response.html', response=response)
 
-# Functions for fuzzy matching and getting financial institution data remain the same as in your current code
+# Function to detect city or province
+def detect_city_or_province(user_input, cities_list, provinces_list):
+    # Fuzzy match city with a higher threshold of 90 for more precise matches
+    closest_city = process.extractOne(user_input, cities_list, scorer=fuzz.partial_ratio)
+    if closest_city and closest_city[1] >= 90:
+        return 'city', closest_city[0]
 
+    # Fuzzy match province with a threshold of 90 for more accurate matches
+    closest_province = process.extractOne(user_input, provinces_list, scorer=fuzz.partial_ratio)
+    if closest_province and closest_province[1] >= 90:
+        return 'province', closest_province[0]
+
+    return None, None
+
+# Run the Flask app
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))
