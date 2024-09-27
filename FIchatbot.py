@@ -70,52 +70,65 @@ def get_average_fis(df):
 # Chatbot route
 @app.route('/chatbot', methods=['POST'])
 def chatbot():
-    global user_context  # Ensure we access the global context variable
-    user_input = request.json.get('query', '').lower().strip()
+    user_input = request.json.get('query', '').lower()
 
-    # Reset context if user says "yes" or "continue"
-    if user_input in ["yes", "continue"]:
-        user_context['awaiting_input'] = True
+    if user_input == 'exit':
+        return jsonify("Thank you for using the chatbot! Goodbye.")
+
+    # Continue with city, province, or statistics detection and switching logic
+    global current_mode
+    if current_mode is None:  # First question or after reset
+        current_mode = "ask_category"
         return jsonify("Are you asking about a city, a province, or statistics?")
 
-    # If bot is awaiting an answer for the type of search (city/province/statistics)
-    if user_context['awaiting_input']:
-        if user_input in ['city', 'cities']:
-            user_context['type'] = 'city'
-            user_context['awaiting_input'] = False
+    if current_mode == "ask_category":
+        if "city" in user_input:
+            current_mode = "city"
             return jsonify("Please provide the name of the city.")
-        elif user_input in ['province', 'provinces']:
-            user_context['type'] = 'province'
-            user_context['awaiting_input'] = False
+        elif "province" in user_input:
+            current_mode = "province"
             return jsonify("Please provide the name of the province.")
-        elif user_input in ['statistics', 'mean', 'max', 'min']:
-            user_context['type'] = 'statistics'
-            user_context['awaiting_input'] = False
-            return jsonify("What type of statistic are you asking for (mean, max, or min)?")
+        elif "statistics" in user_input:
+            current_mode = "statistics"
+            return jsonify("Please specify 'mean', 'max', or 'min'.")
         else:
             return jsonify("Please choose from 'city', 'province', or 'statistics'.")
 
-    # If the bot is not awaiting a specific input, proceed based on context
-    if user_context['type'] == 'city':
+    if current_mode == "city":
         response = get_fis_in_city(user_input, data)
-        return jsonify(f"{response}, Do you want to continue searching for cities, or do you want to switch to provinces or statistics?")
+        if response:
+            current_mode = "ask_next_step"
+            return jsonify(f"{response}, Do you want to continue searching for cities, or switch to provinces or statistics?")
+        else:
+            return jsonify("No data found for city: " + user_input)
 
-    elif user_context['type'] == 'province':
+    if current_mode == "province":
         response = get_cities_in_province(user_input, data)
-        if isinstance(response, dict):
-            return jsonify(f"{response['Province']} has {response['Total FIs']} FIs. Highest FIs: {response['City with Max FIs']}. Lowest FIs: {response['City with Min FIs']}, Do you want to continue searching for provinces or statistics?")
-        return jsonify(f"{response}, Do you want to continue searching for provinces or statistics?")
-    
-    elif user_context['type'] == 'statistics':
-        if "average" in user_input or "mean" in user_input:
-            response = get_average_fis(data)
+        if response:
+            current_mode = "ask_next_step"
+            return jsonify(f"{response}, Do you want to continue searching for provinces, or switch to cities or statistics?")
+        else:
+            return jsonify("No data found for province: " + user_input)
+
+    if current_mode == "statistics":
+        response = handle_statistics_query(user_input, data)
+        if response:
+            current_mode = "ask_next_step"
+            return jsonify(f"{response}, Do you want to continue searching for statistics, or switch to cities or provinces?")
         else:
             return jsonify("Statistics type not recognized. Please ask for 'mean', 'max', or 'min'.")
-        return jsonify(f"{response}, Do you want to continue searching for statistics or switch to cities or provinces?")
-    
-    # If context not set, ask the user what they want to search
-    user_context['awaiting_input'] = True
-    return jsonify("Are you asking about a city, a province, or statistics?")
+
+    if current_mode == "ask_next_step":
+        if "continue" in user_input:
+            if "city" in last_query_type:
+                return jsonify("Please provide the name of the city.")
+            elif "province" in last_query_type:
+                return jsonify("Please provide the name of the province.")
+        elif "switch" in user_input:
+            current_mode = "ask_category"
+            return jsonify("Are you asking about a city, a province, or statistics?")
+        else:
+            return jsonify("Please respond with 'continue' to keep searching or 'switch' to change categories.")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
