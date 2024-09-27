@@ -8,122 +8,142 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             background-color: #f0f0f0;
             color: #333;
         }
-        .chat-container {
-            width: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            height: 80vh;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
+        h1 {
+            color: #4CAF50;
+            font-size: 2.5em;
         }
-        .chat-history {
-            flex-grow: 1;
-            overflow-y: auto;
-            margin-bottom: 10px;
-        }
-        .chat-bubble {
-            margin: 5px 0;
-            padding: 10px;
-            border-radius: 10px;
-            max-width: 80%;
-        }
-        .chat-bubble.user {
-            background-color: #4CAF50;
-            color: white;
-            align-self: flex-end;
-        }
-        .chat-bubble.bot {
-            background-color: #f1f1f1;
+        h2 {
+            margin-top: 20px;
             color: #333;
-            align-self: flex-start;
         }
-        .chat-input {
-            display: flex;
-            margin-top: 10px;
+        .subtitle {
+            font-size: 1.2em;
+            color: #777;
+            margin-bottom: 20px;
         }
-        .chat-input input[type="text"] {
-            flex-grow: 1;
+        form {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        input[type="text"] {
+            width: 100%;
             padding: 10px;
-            border-radius: 5px;
+            margin: 10px 0;
             border: 1px solid #ccc;
-            margin-right: 10px;
+            border-radius: 4px;
         }
-        .chat-input button {
-            padding: 10px 20px;
+        input[type="submit"], #sendButton {
             background-color: #4CAF50;
             color: white;
+            padding: 10px 20px;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
             cursor: pointer;
         }
-        .chat-input button:hover {
+        input[type="submit"]:hover, #sendButton:hover {
             background-color: #45a049;
         }
-        .chat-bubble.bot span.instructions {
-            font-style: italic;
-            color: #777;
+        pre {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        #chatContainer {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        #response {
+            margin-top: 20px;
         }
     </style>
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-history" id="chatHistory">
-            <!-- Chat messages will appear here -->
-            <div class="chat-bubble bot">
-                <span class="instructions">Welcome to the Philippine Financial Institutions Chatbot! You can ask about cities, provinces, or statistics. Type your question below or type "exit" to end the chat.</span>
-            </div>
+    <div id="chatContainer">
+        <h1>Philippine Financial Institutions Chatbot</h1>
+        <div class="subtitle">
+            Welcome to the Philippine Financial Institutions Chatbot! You can ask about cities, provinces, or statistics. Type your question below or type "exit" to end the chat.
         </div>
-        <div class="chat-input">
-            <input type="text" id="query" placeholder="Type your message here..." autofocus required>
-            <button id="submitBtn">Send</button>
+        
+        <div id="chatArea">
+            <!-- This is where the chat history will be appended dynamically -->
         </div>
+
+        <!-- Form to submit a query -->
+        <input type="text" id="query" name="query" placeholder="Type your message here..." required>
+        <button id="sendButton">Send</button>
+        
+        <div id="response"></div>
     </div>
 
-<script>
-    document.getElementById("chatbotForm").addEventListener("submit", async function(event) {
-        event.preventDefault();
-        
-        const query = document.getElementById("query").value;
-        const responseElement = document.getElementById("response");
+    <script>
+        document.getElementById("sendButton").addEventListener("click", async function(event) {
+            event.preventDefault(); // Prevent form submission behavior
+            
+            const query = document.getElementById("query").value.trim();
+            if (!query) {
+                return;  // If query is empty, do nothing
+            }
+            
+            // Clear the input field after the query is sent
+            document.getElementById("query").value = '';
 
-        // Send POST request to your Flask chatbot API
-        try {
-            const response = await fetch("https://worker-production-1784.up.railway.app/chatbot", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ query: query }),
-            });
+            // Add the user's query to the chat area
+            const chatArea = document.getElementById("chatArea");
+            const userMessage = document.createElement("div");
+            userMessage.textContent = query;
+            userMessage.style.background = "#4CAF50";
+            userMessage.style.color = "#fff";
+            userMessage.style.padding = "10px";
+            userMessage.style.marginBottom = "10px";
+            userMessage.style.borderRadius = "10px";
+            chatArea.appendChild(userMessage);
 
-            // Parse the JSON response from the server
-            const data = await response.json();
-
-            // Handle the response and format for display
-            if (Array.isArray(data)) {
-                // Display each message from the chatbot (both answer and follow-up)
-                data.forEach(item => {
-                    const messageElement = document.createElement("div");
-                    messageElement.textContent = item;
-                    responseElement.appendChild(messageElement);
+            // Send POST request to your Flask chatbot API
+            try {
+                const response = await fetch("https://worker-production-1784.up.railway.app/chatbot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ query: query }),
                 });
-            } else {
-                responseElement.textContent = data;
+
+                // Parse the JSON response from the server
+                const data = await response.json();
+
+                // Add the bot's response to the chat area
+                const botMessage = document.createElement("div");
+                botMessage.textContent = data;
+                botMessage.style.background = "#ddd";
+                botMessage.style.padding = "10px";
+                botMessage.style.marginBottom = "10px";
+                botMessage.style.borderRadius = "10px";
+                chatArea.appendChild(botMessage);
+
+            } catch (error) {
+                // Display error message in case of connection issues
+                const errorMessage = document.createElement("div");
+                errorMessage.textContent = "Error: Could not connect to chatbot.";
+                errorMessage.style.background = "#f44336";
+                errorMessage.style.color = "#fff";
+                errorMessage.style.padding = "10px";
+                errorMessage.style.marginBottom = "10px";
+                errorMessage.style.borderRadius = "10px";
+                chatArea.appendChild(errorMessage);
             }
 
-        } catch (error) {
-            responseElement.textContent = "Error: Could not connect to chatbot.";
-        }
-    });
-</script>
+            // Scroll to the bottom of the chat area
+            chatArea.scrollTop = chatArea.scrollHeight;
+        });
+    </script>
 </body>
 </html>
