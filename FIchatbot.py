@@ -27,15 +27,16 @@ app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Global variable to track query type (city, province, or statistics)
-session_state = {}
+session_state = {
+    "query_type": None  # Keeps track of whether the user is asking about city, province, or statistics
+}
 
-# Fuzzy matching functions (same as before)
+# Fuzzy matching functions
 def get_fis_in_city(city_name, df):
     logging.debug(f"Searching for city: {city_name}")
     city_name = city_name.strip().lower()
     df['Cities'] = df['Cities'].str.strip().str.lower()
 
-    # Loosen the fuzzy matching threshold slightly
     result = process.extractOne(city_name, df['Cities'], scorer=fuzz.partial_ratio)
     
     if result:
@@ -82,21 +83,24 @@ def get_cities_in_province(province_name, df):
 # Detect query type (city, province, or statistics)
 def detect_query_type(user_input):
     if "city" in user_input:
-        session_state["type"] = "city"
+        session_state["query_type"] = "city"
         return "Please provide the name of the city."
     elif "province" in user_input:
-        session_state["type"] = "province"
+        session_state["query_type"] = "province"
         return "Please provide the name of the province."
     elif any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
-        session_state["type"] = "statistics"
+        session_state["query_type"] = "statistics"
         return "Please specify the type of statistic (mean, max, min)."
     else:
-        # Ask the user to clarify
         return "Are you asking about a city, a province, or statistics?"
 
-# Reset session after user types "exit"
+# Reset session state after completion of a query
 def reset_session():
-    session_state.clear()
+    session_state["query_type"] = None
+
+# Follow-up question to continue or switch
+def follow_up_question():
+    return "Do you want to continue searching for cities, or do you want to switch to provinces or statistics?"
 
 # Flask route to interact with the chatbot
 @app.route('/chatbot', methods=['GET', 'POST'])
@@ -105,28 +109,30 @@ def chatbot():
         return "Chatbot is running. Please use POST requests."
     
     user_input = request.json.get('query', '').lower()
-    
+
     # Exit condition
     if "exit" in user_input:
         reset_session()
         return jsonify("Thank you for using the chatbot! Goodbye.")
     
-    # Immediately detect query type without waiting
-    if "type" not in session_state:
+    # If no query type has been set, detect query type
+    if not session_state["query_type"]:
         response = detect_query_type(user_input)
         return jsonify(response)
     
     # Process the query based on the detected type
-    if session_state["type"] == "city":
+    if session_state["query_type"] == "city":
         response = get_fis_in_city(user_input, data)
-    elif session_state["type"] == "province":
+    elif session_state["query_type"] == "province":
         response = get_cities_in_province(user_input, data)
-    elif session_state["type"] == "statistics":
+    elif session_state["query_type"] == "statistics":
         response = "Statistics feature is under development."  # Placeholder for future implementation
     else:
         response = "I don't understand your query. Please ask about cities, provinces, or statistics."
 
-    return jsonify(response)
+    # After answering the question, ask if the user wants to continue or switch
+    follow_up = follow_up_question()
+    return jsonify([response, follow_up])
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
