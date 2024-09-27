@@ -7,7 +7,7 @@ Created on Wed Sep 25 22:48:47 2024
 """
 
 from flask_cors import CORS
-from flask import Flask, request, jsonify
+from flask import Flask #, request, jsonify
 import pandas as pd
 from fuzzywuzzy import fuzz, process
 
@@ -20,7 +20,7 @@ provinces_list = data['Province'].str.lower().unique()
 
 # Create Flask app
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Fuzzy matching functions
 def get_fis_in_city(city_name, df):
