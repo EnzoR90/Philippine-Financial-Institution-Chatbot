@@ -22,11 +22,9 @@ provinces_list = data['Province'].str.lower().unique()
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Global variable to store the user's current search context (city/province/statistics)
-user_context = {
-    'type': None,  # 'city', 'province', 'statistics'
-    'awaiting_input': False  # Whether the bot is waiting for the user to answer a question
-}
+# Global state tracking
+current_mode = None
+last_query_type = None
 
 # Fuzzy matching functions
 def get_fis_in_city(city_name, df):
@@ -53,13 +51,7 @@ def get_cities_in_province(province_name, df):
         total_fis = province_data['Total Number of Fis'].sum()
         max_fis = province_data.loc[province_data['Total Number of Fis'].idxmax()]
         min_fis = province_data.loc[province_data['Total Number of Fis'].idxmin()]
-        return {
-            'Province': closest_match,
-            'Total FIs': total_fis,
-            'Cities and FIs': cities_info,
-            'City with Max FIs': f"{max_fis['Cities']} ({max_fis['Total Number of Fis']} FIs)",
-            'City with Min FIs': f"{min_fis['Cities']} ({min_fis['Total Number of Fis']} FIs)"
-        }
+        return f"{closest_match} has {total_fis} FIs. Highest FIs: {max_fis['Cities']} ({max_fis['Total Number of Fis']} FIs). Lowest FIs: {min_fis['Cities']} ({min_fis['Total Number of Fis']} FIs)"
     
     return f"No data found for province: {province_name}"
 
@@ -76,7 +68,8 @@ def chatbot():
         return jsonify("Thank you for using the chatbot! Goodbye.")
 
     # Continue with city, province, or statistics detection and switching logic
-    global current_mode
+    global current_mode, last_query_type
+    
     if current_mode is None:  # First question or after reset
         current_mode = "ask_category"
         return jsonify("Are you asking about a city, a province, or statistics?")
@@ -97,33 +90,39 @@ def chatbot():
     if current_mode == "city":
         response = get_fis_in_city(user_input, data)
         if response:
+            last_query_type = "city"
             current_mode = "ask_next_step"
-            return jsonify(f"{response}, Do you want to continue searching for cities, or switch to provinces or statistics?")
+            return jsonify(f"{response}. Do you want to continue searching for cities, or switch to provinces or statistics?")
         else:
-            return jsonify("No data found for city: " + user_input)
+            return jsonify(f"No data found for city: {user_input}")
 
     if current_mode == "province":
         response = get_cities_in_province(user_input, data)
         if response:
+            last_query_type = "province"
             current_mode = "ask_next_step"
-            return jsonify(f"{response}, Do you want to continue searching for provinces, or switch to cities or statistics?")
+            return jsonify(f"{response}. Do you want to continue searching for provinces, or switch to cities or statistics?")
         else:
-            return jsonify("No data found for province: " + user_input)
+            return jsonify(f"No data found for province: {user_input}")
 
     if current_mode == "statistics":
-        response = handle_statistics_query(user_input, data)
-        if response:
-            current_mode = "ask_next_step"
-            return jsonify(f"{response}, Do you want to continue searching for statistics, or switch to cities or provinces?")
+        if user_input == "mean":
+            response = get_average_fis(data)
         else:
             return jsonify("Statistics type not recognized. Please ask for 'mean', 'max', or 'min'.")
 
+        last_query_type = "statistics"
+        current_mode = "ask_next_step"
+        return jsonify(f"{response}. Do you want to continue searching for statistics, or switch to cities or provinces?")
+
     if current_mode == "ask_next_step":
         if "continue" in user_input:
-            if "city" in last_query_type:
+            if last_query_type == "city":
                 return jsonify("Please provide the name of the city.")
-            elif "province" in last_query_type:
+            elif last_query_type == "province":
                 return jsonify("Please provide the name of the province.")
+            elif last_query_type == "statistics":
+                return jsonify("Please specify 'mean', 'max', or 'min'.")
         elif "switch" in user_input:
             current_mode = "ask_category"
             return jsonify("Are you asking about a city, a province, or statistics?")
