@@ -3,22 +3,149 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financial Inclusion Chatbot</title>
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='icons/favicon.ico') }}">
-    <link rel="icon" sizes="48x48" href="{{ url_for('static', filename='icons/favicon.ico') }}">
-    <link rel="icon" sizes="32x32" href="{{ url_for('static', filename='icons/favicon-32x32.png') }}">
-    <link rel="icon" sizes="16x16" href="{{ url_for('static', filename='icons/favicon-16x16.png') }}">
-    <link rel="icon" sizes="512x512" href="{{ url_for('static', filename='icons/android-chrome-512x512.png') }}">
-    <link rel="icon" sizes="192x192" href="{{ url_for('static', filename='icons/android-chrome-192x192.png') }}">
-    <link rel="apple-touch-icon-precomposed" sizes="180x180" href="{{ url_for('static', filename='icons/apple-touch-icon-precomposed.png') }}">
+    <title>Philippine Financial Institutions Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-history {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+        .chat-bubble {
+            margin: 5px 0;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        .chat-bubble.user {
+            background-color: #4CAF50;
+            color: white;
+            align-self: flex-end;
+        }
+        .chat-bubble.bot {
+            background-color: #f1f1f1;
+            color: #333;
+            align-self: flex-start;
+        }
+        .chat-input {
+            display: flex;
+            margin-top: 10px;
+        }
+        .chat-input input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+        }
+        .chat-input button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .chat-input button:hover {
+            background-color: #45a049;
+        }
+        .chat-bubble.bot span.instructions {
+            font-style: italic;
+            color: #777;
+        }
+    </style>
 </head>
 <body>
-    <h1>Welcome to the Financial Inclusion Chatbot</h1>
-    <form action="/get_response" method="POST">
-        <label for="user_input">Ask me anything about cities or provinces:</label>
-        <input type="text" id="user_input" name="user_input" placeholder="Enter your question">
-        <button type="submit">Submit</button>
-    </form>
+    <div class="chat-container">
+        <div class="chat-history" id="chatHistory">
+            <!-- Chat messages will appear here -->
+            <div class="chat-bubble bot">
+                <span class="instructions">Welcome to the Philippine Financial Institutions Chatbot! You can ask about cities, provinces, or statistics. Type your question below or type "exit" to end the chat.</span>
+            </div>
+        </div>
+        <div class="chat-input">
+            <input type="text" id="query" placeholder="Type your message here..." autofocus required>
+            <button id="submitBtn">Send</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('submitBtn').addEventListener('click', sendMessage);
+
+        document.getElementById('query').addEventListener('keypress', function (event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const query = document.getElementById("query").value.trim();
+            if (!query) return; // Don't send empty messages
+
+            // Add user message to chat history
+            addMessageToChat('user', query);
+
+            // Send POST request to your Flask chatbot API
+            try {
+                const response = await fetch("https://worker-production-1784.up.railway.app/chatbot", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                const data = await response.json();
+
+                // Display chatbot's response
+                if (Array.isArray(data)) {
+                    const result = data.map(item => `${item.Cities}, ${item.Province}: ${item['Total Number of Fis']} FIs`).join("\n");
+                    addMessageToChat('bot', result);
+                } else {
+                    addMessageToChat('bot', data);
+                }
+                
+                // If the user types "exit", show exit message and clear input
+                if (query.toLowerCase() === 'exit') {
+                    addMessageToChat('bot', 'Thank you for using the chatbot! Goodbye.');
+                    document.getElementById('query').disabled = true;
+                    document.getElementById('submitBtn').disabled = true;
+                }
+
+            } catch (error) {
+                addMessageToChat('bot', "Error: Could not connect to chatbot.");
+            }
+
+            document.getElementById("query").value = ''; // Clear the input box
+        }
+
+        function addMessageToChat(sender, message) {
+            const chatHistory = document.getElementById('chatHistory');
+            const chatBubble = document.createElement('div');
+            chatBubble.classList.add('chat-bubble', sender);
+            chatBubble.textContent = message;
+            chatHistory.appendChild(chatBubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Scroll to the latest message
+        }
+    </script>
 </body>
 </html>
