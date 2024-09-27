@@ -10,10 +10,6 @@ from flask_cors import CORS
 from flask import Flask, request, jsonify
 import pandas as pd
 from fuzzywuzzy import fuzz, process
-import logging
-
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
 
 # Load the dataset
 file_path = './Updated_FinancialInclusion_Final.csv'
@@ -26,120 +22,95 @@ provinces_list = data['Province'].str.lower().unique()
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Global variable to track query type (city, province, or statistics)
-session_state = {
-    "query_type": None  # Keeps track of whether the user is asking about city, province, or statistics
+# Global variable to store the user's current search context (city/province/statistics)
+user_context = {
+    'type': None,  # 'city', 'province', 'statistics'
+    'awaiting_input': False  # Whether the bot is waiting for the user to answer a question
 }
 
 # Fuzzy matching functions
 def get_fis_in_city(city_name, df):
-    logging.debug(f"Searching for city: {city_name}")
     city_name = city_name.strip().lower()
     df['Cities'] = df['Cities'].str.strip().str.lower()
-
     result = process.extractOne(city_name, df['Cities'], scorer=fuzz.partial_ratio)
     
-    if result:
-        closest_match, score = result[0], result[1]
-        logging.debug(f"Best match: {closest_match} with score: {score}")
-        if score >= 80:
-            city_data = df[df['Cities'] == closest_match]
-            # Ensure we are correctly extracting city, province, and FIs
-            if not city_data.empty:
-                city_record = city_data.iloc[0]
-                return f"{city_record['Cities']}, {city_record['Province']}: {city_record['Total Number of Fis']} FIs"
+    if result and result[1] >= 80:
+        closest_match = result[0]
+        city_data = df[df['Cities'] == closest_match]
+        return f"{city_data.iloc[0]['Cities']}, {city_data.iloc[0]['Province']}: {city_data.iloc[0]['Total Number of Fis']} FIs"
     
     return f"No data found for city: {city_name}"
 
 def get_cities_in_province(province_name, df):
-    logging.debug(f"Searching for province: {province_name}")
     province_name = province_name.strip().lower()
     df['Province'] = df['Province'].str.strip().str.lower()
-
     result = process.extractOne(province_name, df['Province'], scorer=fuzz.partial_ratio)
     
-    if result:
-        closest_match, score = result[0], result[1]
-        logging.debug(f"Best match: {closest_match} with score: {score}")
-        if score >= 90:
-            province_data = df[df['Province'] == closest_match]
-            cities_info = province_data[['Cities', 'Total Number of Fis']].to_dict(orient='records')
-            total_fis_in_province = province_data['Total Number of Fis'].sum()
-            city_with_highest_fis = province_data.loc[province_data['Total Number of Fis'].idxmax()]
-            city_with_lowest_fis = province_data.loc[province_data['Total Number of Fis'].idxmin()]
-
-            # Properly format the response
-            response = {
-                'Province': closest_match,
-                'Total FIs in Province': total_fis_in_province,
-                'Cities and FIs': cities_info,
-                'City with Highest FIs': {
-                    'City': city_with_highest_fis['Cities'],
-                    'Total FIs': city_with_highest_fis['Total Number of Fis']
-                },
-                'City with Lowest FIs': {
-                    'City': city_with_lowest_fis['Cities'],
-                    'Total FIs': city_with_lowest_fis['Total Number of Fis']
-                }
-            }
-            return response
+    if result and result[1] >= 80:
+        closest_match = result[0]
+        province_data = df[df['Province'] == closest_match]
+        cities_info = province_data[['Cities', 'Total Number of Fis']].to_dict(orient='records')
+        total_fis = province_data['Total Number of Fis'].sum()
+        max_fis = province_data.loc[province_data['Total Number of Fis'].idxmax()]
+        min_fis = province_data.loc[province_data['Total Number of Fis'].idxmin()]
+        return {
+            'Province': closest_match,
+            'Total FIs': total_fis,
+            'Cities and FIs': cities_info,
+            'City with Max FIs': f"{max_fis['Cities']} ({max_fis['Total Number of Fis']} FIs)",
+            'City with Min FIs': f"{min_fis['Cities']} ({min_fis['Total Number of Fis']} FIs)"
+        }
     
     return f"No data found for province: {province_name}"
 
-# Detect query type (city, province, or statistics)
-def detect_query_type(user_input):
-    if "city" in user_input:
-        session_state["query_type"] = "city"
-        return "Please provide the name of the city."
-    elif "province" in user_input:
-        session_state["query_type"] = "province"
-        return "Please provide the name of the province."
-    elif any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
-        session_state["query_type"] = "statistics"
-        return "Please specify the type of statistic (mean, max, min)."
-    else:
-        return "Are you asking about a city, a province, or statistics?"
+def get_average_fis(df):
+    average_fis = df['Total Number of Fis'].mean()
+    return f"The average number of FIs across all locations is {average_fis:.2f} FIs."
 
-# Reset session state after completion of a query
-def reset_session():
-    session_state["query_type"] = None
-
-# Follow-up question to continue or switch
-def follow_up_question():
-    return "Do you want to continue searching for cities, or do you want to switch to provinces or statistics?"
-
-@app.route('/chatbot', methods=['GET', 'POST'])
+# Chatbot route
+@app.route('/chatbot', methods=['POST'])
 def chatbot():
-    if request.method == 'GET':
-        return "Chatbot is running. Please use POST requests."
-    
-    user_input = request.json.get('query', '').lower()
+    global user_context  # Ensure we access the global context variable
+    user_input = request.json.get('query', '').lower().strip()
 
-    # Exit condition
-    if "exit" in user_input:
-        reset_session()
-        return jsonify("Thank you for using the chatbot! Goodbye.")
-    
-    # If no query type has been set, detect query type
-    if not session_state["query_type"]:
-        response = detect_query_type(user_input)
-        return jsonify(response)
-    
-    # Process the query based on the detected type
-    if session_state["query_type"] == "city":
+    # If bot is awaiting an answer for the type of search (city/province/statistics)
+    if user_context['awaiting_input']:
+        if user_input in ['city', 'cities']:
+            user_context['type'] = 'city'
+            user_context['awaiting_input'] = False
+            return jsonify("Please provide the name of the city.")
+        elif user_input in ['province', 'provinces']:
+            user_context['type'] = 'province'
+            user_context['awaiting_input'] = False
+            return jsonify("Please provide the name of the province.")
+        elif user_input in ['statistics', 'mean', 'max', 'min']:
+            user_context['type'] = 'statistics'
+            user_context['awaiting_input'] = False
+            return jsonify("What type of statistic are you asking for (mean, max, or min)?")
+        else:
+            return jsonify("Please choose from 'city', 'province', or 'statistics'.")
+
+    # If the bot is not awaiting a specific input, proceed based on context
+    if user_context['type'] == 'city':
         response = get_fis_in_city(user_input, data)
-    elif session_state["query_type"] == "province":
-        response = get_cities_in_province(user_input, data)
-    elif session_state["query_type"] == "statistics":
-        response = "Statistics feature is under development."  # Placeholder for future implementation
-    else:
-        response = "I don't understand your query. Please ask about cities, provinces, or statistics."
+        return jsonify(f"{response},Do you want to continue searching for cities, or do you want to switch to provinces or statistics?")
 
-    # After answering the question, ask if the user wants to continue or switch
-    follow_up = follow_up_question()
+    elif user_context['type'] == 'province':
+        response = get_cities_in_province(user_input, data)
+        if isinstance(response, dict):
+            return jsonify(f"{response['Province']} has {response['Total FIs']} FIs. Highest FIs: {response['City with Max FIs']}. Lowest FIs: {response['City with Min FIs']},Do you want to continue searching for provinces or statistics?")
+        return jsonify(f"{response},Do you want to continue searching for provinces or statistics?")
     
-    # Return response and follow-up as two separate JSON entries to avoid double replies
-    return jsonify([response, follow_up])
+    elif user_context['type'] == 'statistics':
+        if "average" in user_input or "mean" in user_input:
+            response = get_average_fis(data)
+        else:
+            return jsonify("Statistics type not recognized. Please ask for 'mean', 'max', or 'min'.")
+        return jsonify(f"{response},Do you want to continue searching for statistics or switch to cities or provinces?")
+    
+    # If context not set, ask the user what they want to search
+    user_context['awaiting_input'] = True
+    return jsonify("Are you asking about a city, a province, or statistics?")
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
