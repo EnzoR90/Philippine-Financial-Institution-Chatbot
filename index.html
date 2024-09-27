@@ -21,6 +21,11 @@
             color: #4CAF50;
             font-size: 2em;
         }
+        .instructions {
+            font-size: 0.9em;
+            color: #777;
+            margin-bottom: 10px;
+        }
         .chat-box {
             border: 1px solid #ccc;
             border-radius: 5px;
@@ -68,6 +73,12 @@
 <body>
     <div class="chat-container">
         <h1>Philippine Financial Institutions Chatbot</h1>
+        <p class="instructions">
+            You can start by typing anything e.g., <br><strong>"Hey"<br><strong>.
+            
+            You can ask about financial institutions in cities, provinces, or request statistics (mean, max, min). For example, type:
+            <br><strong>"How many FIs are in Manila?"</strong> or <strong>"Give me statistics for FIs."</strong> Type "exit" to end the chat.
+        </p>
         <div id="chatbox" class="chat-box"></div>
         <div class="input-box">
             <input type="text" id="user-input" placeholder="Type your message here..." onkeydown="if (event.key === 'Enter') { sendMessage(); }">
