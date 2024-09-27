@@ -26,13 +26,16 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 def get_fis_in_city(city_name, df):
     city_name = city_name.strip().lower()
     df['Cities'] = df['Cities'].str.strip().str.lower()
+
+    # Lower the threshold slightly for better matching
     result = process.extractOne(city_name, df['Cities'], scorer=fuzz.partial_ratio)
     
     if result:
         closest_match, score = result[0], result[1]
-        if score >= 90:
+        if score >= 80:  # Adjusted matching threshold
             city_data = df[df['Cities'] == closest_match]
             return city_data[['Cities', 'Province', 'Total Number of Fis']].to_dict(orient='records')
+    
     return f"No data found for city: {city_name}"
 
 def get_cities_in_province(province_name, df):
