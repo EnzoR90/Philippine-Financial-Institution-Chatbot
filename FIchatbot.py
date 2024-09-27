@@ -44,7 +44,10 @@ def get_fis_in_city(city_name, df):
         logging.debug(f"Best match: {closest_match} with score: {score}")
         if score >= 80:
             city_data = df[df['Cities'] == closest_match]
-            return city_data[['Cities', 'Province', 'Total Number of Fis']].to_dict(orient='records')
+            # Ensure we are correctly extracting city, province, and FIs
+            if not city_data.empty:
+                city_record = city_data.iloc[0]
+                return f"{city_record['Cities']}, {city_record['Province']}: {city_record['Total Number of Fis']} FIs"
     
     return f"No data found for city: {city_name}"
 
@@ -64,6 +67,8 @@ def get_cities_in_province(province_name, df):
             total_fis_in_province = province_data['Total Number of Fis'].sum()
             city_with_highest_fis = province_data.loc[province_data['Total Number of Fis'].idxmax()]
             city_with_lowest_fis = province_data.loc[province_data['Total Number of Fis'].idxmin()]
+
+            # Properly format the response
             response = {
                 'Province': closest_match,
                 'Total FIs in Province': total_fis_in_province,
@@ -78,6 +83,7 @@ def get_cities_in_province(province_name, df):
                 }
             }
             return response
+    
     return f"No data found for province: {province_name}"
 
 # Detect query type (city, province, or statistics)
@@ -102,7 +108,6 @@ def reset_session():
 def follow_up_question():
     return "Do you want to continue searching for cities, or do you want to switch to provinces or statistics?"
 
-# Flask route to interact with the chatbot
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
     if request.method == 'GET':
@@ -132,6 +137,8 @@ def chatbot():
 
     # After answering the question, ask if the user wants to continue or switch
     follow_up = follow_up_question()
+    
+    # Return response and follow-up as two separate JSON entries to avoid double replies
     return jsonify([response, follow_up])
 
 if __name__ == "__main__":
