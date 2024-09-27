@@ -10,10 +10,6 @@ from flask_cors import CORS
 from flask import Flask, request, jsonify
 import pandas as pd
 from fuzzywuzzy import fuzz, process
-import logging  # Import logging module
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 
 # Load the dataset
 file_path = './Updated_FinancialInclusion_Final.csv'
@@ -31,7 +27,6 @@ def get_fis_in_city(city_name, df):
     city_name = city_name.strip().lower()
     df['Cities'] = df['Cities'].str.strip().str.lower()
 
-    # Lower the threshold slightly for better matching
     result = process.extractOne(city_name, df['Cities'], scorer=fuzz.partial_ratio)
     
     if result:
@@ -71,16 +66,35 @@ def get_cities_in_province(province_name, df):
             return response
     return f"No data found for province: {province_name}"
 
-# Example function to detect city or province (ensure this is defined)
-def detect_city_or_province(user_input, cities_list, provinces_list):
+# Function to get statistics for the dataset
+def get_statistics(df, stat_type):
+    if stat_type == "mean" or stat_type == "average":
+        avg_fis = df['Total Number of Fis'].mean()
+        return f"The average number of financial institutions per city is {avg_fis:.2f}"
+    elif stat_type == "max" or stat_type == "highest":
+        max_fis_city = df.loc[df['Total Number of Fis'].idxmax()]
+        return f"{max_fis_city['Cities']} has the highest number of financial institutions with {max_fis_city['Total Number of Fis']} FIs."
+    elif stat_type == "min" or stat_type == "lowest":
+        min_fis_city = df.loc[df['Total Number of Fis'].idxmin()]
+        return f"{min_fis_city['Cities']} has the lowest number of financial institutions with {min_fis_city['Total Number of Fis']} FIs."
+    return "Statistics type not recognized. Please ask for 'mean', 'max', or 'min'."
+
+# Function to detect the type of query (city, province, or statistics)
+def detect_query_type(user_input, cities_list, provinces_list):
     user_input = user_input.lower()
 
+    # Check if the query contains a statistic keyword
+    if any(stat in user_input for stat in ["mean", "average", "max", "highest", "min", "lowest"]):
+        return 'statistic', user_input
+    
+    # Fuzzy match for cities
     closest_city = process.extractOne(user_input, cities_list, scorer=fuzz.partial_ratio)
-    if closest_city and closest_city[1] >= 90:
+    if closest_city and closest_city[1] >= 80:
         return 'city', closest_city[0]
 
+    # Fuzzy match for provinces
     closest_province = process.extractOne(user_input, provinces_list, scorer=fuzz.partial_ratio)
-    if closest_province and closest_province[1] >= 90:
+    if closest_province and closest_province[1] >= 80:
         return 'province', closest_province[0]
 
     return None, None
@@ -88,34 +102,22 @@ def detect_city_or_province(user_input, cities_list, provinces_list):
 # Flask route to interact with the chatbot
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
-    try:
-        if request.method == 'GET':
-            return "Chatbot is running. Please use POST requests."
-        
-        user_input = request.json.get('query', '').lower()
-        logging.info(f"User input: {user_input}")
-
-        entity_type, entity_value = detect_city_or_province(user_input, cities_list, provinces_list)
-
-        if entity_type == 'city':
-            response = get_fis_in_city(entity_value, data)
-        elif entity_type == 'province':
-            response = get_cities_in_province(entity_value, data)
-        elif "highest" in user_input or "most" in user_input:
-            response = get_city_with_extreme_fis(data, highest=True)
-        elif "lowest" in user_input or "fewest" in user_input:
-            response = get_city_with_extreme_fis(data, highest=False)
-        elif "average" in user_input or "statistics" in user_input:
-            response = get_average_fis(data)
-        else:
-            response = "I don't understand your query. Please ask about cities, provinces, or statistics."
-        
-        logging.info(f"Response: {response}")
-        return jsonify(response)
+    if request.method == 'GET':
+        return "Chatbot is running. Please use POST requests."
     
-    except Exception as e:
-        logging.error(f"Error: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+    user_input = request.json.get('query', '').lower()
+    query_type, query_value = detect_query_type(user_input, cities_list, provinces_list)
+
+    if query_type == 'city':
+        response = get_fis_in_city(query_value, data)
+    elif query_type == 'province':
+        response = get_cities_in_province(query_value, data)
+    elif query_type == 'statistic':
+        response = get_statistics(data, query_value)
+    else:
+        response = "I don't understand your query. Please ask about cities, provinces, or statistics."
+
+    return jsonify(response)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
