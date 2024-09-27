@@ -79,9 +79,8 @@ def get_cities_in_province(province_name, df):
             return response
     return f"No data found for province: {province_name}"
 
-# Detect city, province, or statistics
+# Detect query type (city, province, or statistics)
 def detect_query_type(user_input):
-    # Step 1: Immediately check if the input matches city or province keywords
     if "city" in user_input:
         session_state["type"] = "city"
         return "Please provide the name of the city."
