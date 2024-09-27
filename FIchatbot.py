@@ -7,9 +7,13 @@ Created on Wed Sep 25 22:48:47 2024
 """
 
 from flask_cors import CORS
-from flask import Flask #, request, jsonify
+from flask import Flask, request, jsonify
 import pandas as pd
 from fuzzywuzzy import fuzz, process
+import logging  # Import logging module
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # Load the dataset
 file_path = './Updated_FinancialInclusion_Final.csv'
@@ -84,26 +88,34 @@ def detect_city_or_province(user_input, cities_list, provinces_list):
 # Flask route to interact with the chatbot
 @app.route('/chatbot', methods=['GET', 'POST'])
 def chatbot():
-    if request.method == 'GET':
-        return "Chatbot is running. Please use POST requests."
-    
-    user_input = request.json.get('query', '').lower()
-    entity_type, entity_value = detect_city_or_province(user_input, cities_list, provinces_list)
+    try:
+        if request.method == 'GET':
+            return "Chatbot is running. Please use POST requests."
+        
+        user_input = request.json.get('query', '').lower()
+        logging.info(f"User input: {user_input}")
 
-    if entity_type == 'city':
-        response = get_fis_in_city(entity_value, data)
-    elif entity_type == 'province':
-        response = get_cities_in_province(entity_value, data)
-    elif "highest" in user_input or "most" in user_input:
-        response = get_city_with_extreme_fis(data, highest=True)
-    elif "lowest" in user_input or "fewest" in user_input:
-        response = get_city_with_extreme_fis(data, highest=False)
-    elif "average" in user_input or "statistics" in user_input:
-        response = get_average_fis(data)
-    else:
-        response = "I don't understand your query. Please ask about cities, provinces, or statistics."
+        entity_type, entity_value = detect_city_or_province(user_input, cities_list, provinces_list)
+
+        if entity_type == 'city':
+            response = get_fis_in_city(entity_value, data)
+        elif entity_type == 'province':
+            response = get_cities_in_province(entity_value, data)
+        elif "highest" in user_input or "most" in user_input:
+            response = get_city_with_extreme_fis(data, highest=True)
+        elif "lowest" in user_input or "fewest" in user_input:
+            response = get_city_with_extreme_fis(data, highest=False)
+        elif "average" in user_input or "statistics" in user_input:
+            response = get_average_fis(data)
+        else:
+            response = "I don't understand your query. Please ask about cities, provinces, or statistics."
+        
+        logging.info(f"Response: {response}")
+        return jsonify(response)
     
-    return jsonify(response)
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
