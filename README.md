@@ -12,31 +12,69 @@ The original project can be accessed using the following ArcGIS Pro links:
 
 ## Project Information
 
-This chatbot allows users to ask about the number of financial institutions (FIs) in cities and provinces across the Philippines, as well as general statistics such as mean, maximum, and minimum FIs.
+This is a chatbot built using Flask that provides users with information about the number of financial institutions (FIs) across cities and provinces in the Philippines. The chatbot also provides statistical insights (mean, max, min) for FIs across the country.
 
-### Features
-- Query FIs in specific cities or provinces
-- Get total FIs in a province and a list of cities within it
-- Identify the city with the highest and lowest FIs in a province
-- General statistics like the average number of FIs across cities
+## Features
 
-### Installation
-1. Clone this repository:
-    ```bash
-    git clone https://github.com/your-username/financial-inclusion-chatbot.git
-    cd financial-inclusion-chatbot
-    ```
+- Ask about the number of financial institutions in specific cities or provinces.
+- Query for statistical insights like the mean, max, or min of financial institutions.
+- Switch seamlessly between querying cities, provinces, or statistics.
+
+## How to Use
+
+You can start by typing any message like "Hey" to initiate the conversation. The chatbot will guide you through selecting whether you want information about cities, provinces, or statistics.
+
+### Example Queries:
+
+- **City Queries**: 
+  - "How many FIs are in Manila?"
+  - "What about in Dumaguete?"
+  
+- **Province Queries**: 
+  - "Tell me about financial institutions in Negros Oriental."
+  
+- **Statistics**: 
+  - "Give me statistics for FIs."
+  - "What is the average number of FIs?"
+
+To exit the chatbot, type `exit`.
+
+## Installation
+
+To run this chatbot locally:
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/EnzoR90/Philippine-Financial-Institution-Chatbot.git
+   cd Philippine-Financial-Institution-Chatbot
 
 2. Install the dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+   ```bash
+   pip install -r requirements.txt
+     
+3. Run the Flask app:
+   ```bash
+   python FIchatbot.py
+   
+4. Open index.html in your browser to interact with the chatbot.
 
-3. Run the chatbot:
-    ```bash
-    python chatbot.py
-    ```
+## Deployment
 
-### License
-This project is licensed under the MIT License.
+The backend is deployed using Railway and the frontend is hosted on GitHub Pages.
 
+	•	Backend (Flask): Deployed on Railway.
+	•	Frontend (HTML): Hosted via GitHub Pages.
+
+## Technologies Used
+
+	•	Backend: Python, Flask, pandas, fuzzywuzzy
+	•	Frontend: HTML, CSS, JavaScript
+	•	Deployment: Railway, GitHub Pages
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Author
+
+Enzo Rodriguez
